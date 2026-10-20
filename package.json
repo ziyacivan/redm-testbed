@@ -1,0 +1,42 @@
+{
+  "name": "redm-testbed",
+  "version": "0.1.0",
+  "description": "Develop FiveM resources on macOS, test them in-game on a Windows PC on your LAN",
+  "license": "MIT",
+  "author": "Yusuf Ziya Civan (https://github.com/ziyacivan)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ziyacivan/redm-testbed.git"
+  },
+  "type": "module",
+  "bin": {
+    "redm-testbed": "dist/main.js"
+  },
+  "files": [
+    "dist",
+    "bridge",
+    "schema.json"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "depcruise src --config .dependency-cruiser.cjs",
+    "test": "vitest run",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
+    "prepack": "pnpm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "dependency-cruiser": "^18.5.0",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.3"
+  }
+}

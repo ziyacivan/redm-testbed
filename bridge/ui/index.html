@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>testbed-bridge</title></head>
+<body>
+<script>
+// Calls the NUI callback of another resource, as the NUI page of that resource does (SPEC-0001 section 9.3).
+// RedM routes https://<resource>/<endpoint> to RegisterNuiCallback of <resource>.
+const BRIDGE = 'testbed-bridge';
+
+async function report(id, result) {
+  try {
+    await fetch(`https://${BRIDGE}/result`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify({ id, result }),
+    });
+  } catch (error) {
+    // The client script times out the request.
+  }
+}
+
+window.addEventListener('message', async (event) => {
+  const message = event.data;
+  if (!message || message.type !== 'testbed:nui_callback') return;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), message.timeoutMs);
+  try {
+    const response = await fetch(`https://${message.resource}/${message.endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+      body: JSON.stringify(message.payload === undefined ? {} : message.payload),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let data = text;
+    try { data = JSON.parse(text); } catch (error) { /* keep the text */ }
+    await report(message.id, { ok: response.ok, data: { status: response.status, body: data } });
+  } catch (error) {
+    await report(message.id, { ok: false, error: controller.signal.aborted ? 'NUI callback timed out' : String(error) });
+  } finally {
+    clearTimeout(timer);
+  }
+});
+</script>
+</body>
+</html>
