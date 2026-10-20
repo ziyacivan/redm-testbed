@@ -15,6 +15,13 @@ describe('parseClientLogLine', () => {
     ).toEqual({ kind: 'error', reason: 'Connection rejected by server: neo needs a Discord account.' });
   });
 
+  it('reads the load markers', () => {
+    const at = (text: string) => parseClientLogLine(`[     34391] [b1491_GTAProce]             MainThrd/ ${text}`);
+    expect(at('rage::gameSkeleton::RunInitFunctions: Done running INIT_CORE init functions!')).toEqual({ kind: 'init-core-done' });
+    expect(at('rage::gameSkeleton::RunInitFunctions: Running INIT_BEFORE_MAP_LOADED init functions')).toEqual({ kind: 'game-load' });
+    expect(at('Awaiting scripts')).toEqual({ kind: 'loaded' });
+  });
+
   it('ignores other lines', () => {
     expect(parseClientLogLine('[ 2781] [FiveM] MainThrd/ hello from FiveM.exe')).toEqual({ kind: 'other' });
   });

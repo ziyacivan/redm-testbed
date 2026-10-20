@@ -2,13 +2,31 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export type ClientLogEvent = { kind: 'progress'; text: string } | { kind: 'error'; reason: string } | { kind: 'other' };
+export type ClientLogEvent =
+  | { kind: 'progress'; text: string }
+  | { kind: 'error'; reason: string }
+  /** The game finished INIT_CORE. A good start goes on to INIT_BEFORE_MAP_LOADED about 15 s later. */
+  | { kind: 'init-core-done' }
+  /** The game left INIT_CORE and loads the map. */
+  | { kind: 'game-load' }
+  /** The loading screen waits for the resource scripts: the game world is loaded. */
+  | { kind: 'loaded' }
+  | { kind: 'other' };
 
 /** Reads one line of `CitizenFX_log_*.log` (SPEC-0003 F2). */
 export function parseClientLogLine(line: string): ClientLogEvent {
   const error = /OnConnectionError: (.*)$/.exec(line);
   if (error) {
     return { kind: 'error', reason: (error[1] ?? '').trim() };
+  }
+  if (line.includes('Done running INIT_CORE init functions!')) {
+    return { kind: 'init-core-done' };
+  }
+  if (line.includes('Running INIT_BEFORE_MAP_LOADED init functions')) {
+    return { kind: 'game-load' };
+  }
+  if (/MainThrd\/ Awaiting scripts$/.test(line.trimEnd())) {
+    return { kind: 'loaded' };
   }
   const progress = /OnConnectionProgress: (.*)$/.exec(line);
   if (progress) {

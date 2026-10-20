@@ -225,7 +225,7 @@ export async function runMcp(): Promise<void> {
   server.registerTool(
     'press_key',
     {
-      description: `Press one key in the game window (scan code input). Keys: ${KEY_NAMES.join(', ')}. Each call is one model turn: for a sequence of inputs use \`steps\`.`,
+      description: `Press one key or a chord (\`ctrl+a\`) in the game window (scan code input). Keys: ${KEY_NAMES.join(', ')}. Each call is one model turn: for a sequence of inputs use \`steps\`.`,
       inputSchema: { key: z.string(), holdMs: z.number().int().min(0).max(10_000).optional() },
     },
     tool(async (args: Params<'window.key'>) => session.call('window.key', args)),

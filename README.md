@@ -82,7 +82,7 @@ List the required secrets in `redm-testbed.config.json`, so `doctor` and `server
 | `logs [--follow] [--lines <n>]` | Show the server console. |
 | `rcon <command...>` | Run a server console command. |
 | `screenshot [--out <file>] [--max <px>]` | Save a PNG of the game window. |
-| `key <name>` | Press a key in the game window. |
+| `key <name>` | Press a key in the game window. A chord such as `ctrl+a` holds the keys in order. |
 | `type <text...>` | Type text into the game window. |
 | `doctor` | Check the configuration, the daemon and the test host. |
 | `mcp` | Start the MCP server (stdio) for an AI agent. |

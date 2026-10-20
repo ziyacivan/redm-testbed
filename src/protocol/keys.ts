@@ -12,7 +12,7 @@ const plain: Record<string, number> = {
   enter: 0x1c, ctrl: 0x1d,
   a: 0x1e, s: 0x1f, d: 0x20, f: 0x21, g: 0x22, h: 0x23, j: 0x24, k: 0x25, l: 0x26,
   shift: 0x2a,
-  z: 0x2c, x: 0x2d, c: 0x2e, v: 0x2f, b: 0x30, n: 0x31, m: 0x32,
+  z: 0x2c, x: 0x2d, c: 0x2e, v: 0x2f, b: 0x30, n: 0x31, m: 0x32, comma: 0x33, period: 0x34, slash: 0x35,
   rshift: 0x36, alt: 0x38, space: 0x39, capslock: 0x3a,
   f1: 0x3b, f2: 0x3c, f3: 0x3d, f4: 0x3e, f5: 0x3f, f6: 0x40, f7: 0x41, f8: 0x42, f9: 0x43, f10: 0x44, f11: 0x57, f12: 0x58,
 };
@@ -29,4 +29,9 @@ export function keyCode(name: string): KeyCode {
   if (Object.hasOwn(plain, key)) return { scan: plain[key] as number, extended: false };
   if (Object.hasOwn(extended, key)) return { scan: extended[key] as number, extended: true };
   throw new Error(`unknown key '${name}'. Known keys: ${KEY_NAMES.join(', ')}`);
+}
+
+/** A chord such as `ctrl+a` or `ctrl+shift+left`: the keys go down in order and come up in reverse order. */
+export function keyChord(name: string): KeyCode[] {
+  return name.split('+').map((part) => keyCode(part.trim()));
 }

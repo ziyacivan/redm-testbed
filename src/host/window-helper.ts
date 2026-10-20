@@ -117,6 +117,19 @@ public static class Testbed {
     Send(new INPUT[] { Key((ushort)scan, flags | KEYEVENTF_KEYUP) });
   }
 
+  public static void PressChord(int[] scans, bool[] extended, int holdMs) {
+    Focus();
+    for (int k = 0; k < scans.Length; k++) {
+      Send(new INPUT[] { Key((ushort)scans[k], KEYEVENTF_SCANCODE | (extended[k] ? KEYEVENTF_EXTENDEDKEY : 0)) });
+      Thread.Sleep(20);
+    }
+    Thread.Sleep(Math.Max(holdMs, 30));
+    for (int k = scans.Length - 1; k >= 0; k--) {
+      Send(new INPUT[] { Key((ushort)scans[k], KEYEVENTF_SCANCODE | (extended[k] ? KEYEVENTF_EXTENDEDKEY : 0) | KEYEVENTF_KEYUP) });
+      Thread.Sleep(20);
+    }
+  }
+
   public static void TypeText(string text) {
     Focus();
     foreach (char c in text) {
@@ -178,6 +191,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
         $data = @{ png = $png; width = $w; height = $h }
       }
       'key' { [Testbed]::PressKey([int]$req.scan, [bool]$req.extended, [int]$req.holdMs) }
+      'chord' { [Testbed]::PressChord([int[]]$req.scans, [bool[]]$req.extended, [int]$req.holdMs) }
       'text' { [Testbed]::TypeText([string]$req.text) }
       'move' { [Testbed]::MouseMove([int]$req.dx, [int]$req.dy) }
       'position' { [Testbed]::MousePosition([int]$req.x, [int]$req.y) }

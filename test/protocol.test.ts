@@ -71,6 +71,12 @@ describe('key codes', async () => {
     expect(keyCode('enter')).toEqual({ scan: 0x1c, extended: false });
     expect(keyCode('up')).toEqual({ scan: 0x48, extended: true });
   });
+  it('maps a chord in order', async () => {
+    const { keyChord } = await import('../src/protocol/keys.ts');
+    expect(keyChord('ctrl+a')).toEqual([{ scan: 0x1d, extended: false }, { scan: 0x1e, extended: false }]);
+    expect(keyChord('slash')).toEqual([{ scan: 0x35, extended: false }]);
+    expect(() => keyChord('ctrl+nope')).toThrow();
+  });
   it('refuses an unknown key and a prototype key', () => {
     expect(() => keyCode('constructor')).toThrow();
     expect(() => keyCode('nope')).toThrow();

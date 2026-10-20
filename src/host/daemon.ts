@@ -15,7 +15,7 @@ import { pipeName } from '../protocol/config.ts';
 import { clientStates, isMethodName, type MethodName, methods, type Params, type Result } from '../protocol/messages.ts';
 import { APP_ERROR, auth, encode, LineSplitter, PROTOCOL_ERROR, request } from '../protocol/rpc.ts';
 import { VERSION } from '../protocol/version.ts';
-import { keyCode } from '../protocol/keys.ts';
+import { keyChord } from '../protocol/keys.ts';
 import { ConsoleBuffer } from './console-buffer.ts';
 import { WindowHelper } from './window-helper.ts';
 import { extraSecrets, type HostPaths, hostPaths, readSecrets, requireSecret, secretLine } from './paths.ts';
@@ -58,6 +58,13 @@ function bridgeResults(output: string): Map<string, BridgeResult> {
   return results;
 }
 
+
+const STALL_REASON = 'the game stopped after INIT_CORE';
+const STALL_AFTER_INIT_CORE_MS = 60_000;
+const STALL_RETRIES = 2;
+// The earlier process must free its graphics memory first (a quick restart once failed with VK_ERROR_OUT_OF_DEVICE_MEMORY).
+const STALL_RESTART_PAUSE_MS = 15_000;
+
 class Daemon {
   private readonly server = new ConsoleBuffer();
   private readonly client = new ConsoleBuffer();
@@ -67,6 +74,8 @@ class Daemon {
   private readonly bridgeInbox = new Map<string, BridgeResult>();
   private readonly window = new WindowHelper();
   private connection: { state: (typeof clientStates)[number]; reason?: string; src?: number; progress?: string } = { state: 'idle' };
+  // Load markers of the current start, from the client log.
+  private load: { initCoreDoneAt?: number; gameLoad: boolean; loaded: boolean } = { gameLoad: false, loaded: false };
   private readonly clientLog = new ClientLogFollower((line) => this.onClientLogLine(line));
   private readonly devcon = new DevconConnection(({ channel, message }) => this.client.push(`[${channel}] ${message}`));
 
@@ -303,6 +312,13 @@ class Daemon {
   private onClientLogLine(line: string): void {
     this.client.push(`[client-log] ${line}`);
     const event = parseClientLogLine(line);
+    if (event.kind === 'init-core-done') {
+      this.load.initCoreDoneAt = Date.now();
+    } else if (event.kind === 'game-load') {
+      this.load.gameLoad = true;
+    } else if (event.kind === 'loaded') {
+      this.load.loaded = true;
+    }
     if (event.kind === 'error' && this.connection.state !== 'joined') {
       this.connection = { state: 'failed', reason: event.reason };
     } else if (event.kind === 'progress' && (this.connection.state === 'starting' || this.connection.state === 'connecting')) {
@@ -322,8 +338,22 @@ class Daemon {
 
   // RedM refuses a start from a service or a task. The shell opens the link (SPEC-0002 D3, F9).
   // With `wait`, returns when the client joined or failed (SPEC-0003 D3, D4).
-  async launch({ wait, timeoutMs }: z.output<typeof methods['client.launch']['params']>): Promise<Result<'client.launch'>> {
+  // A start can stop after INIT_CORE for good (seen 3 times in 10 starts on 2026-10-20; a good start goes on in about
+  // 15 s). With `wait`, such a start is ended and RedM starts again, up to STALL_RETRIES times.
+  async launch(params: z.output<typeof methods['client.launch']['params']>): Promise<Result<'client.launch'>> {
+    let status = await this.launchOnce(params);
+    for (let retry = 0; retry < STALL_RETRIES && status.reason?.startsWith(STALL_REASON); retry++) {
+      this.client.push(`[redm-testbed] ${status.reason}; starting RedM again (${retry + 1} of ${STALL_RETRIES})`);
+      await this.quit();
+      await sleep(STALL_RESTART_PAUSE_MS);
+      status = await this.launchOnce(params);
+    }
+    return status;
+  }
+
+  private async launchOnce({ wait, timeoutMs }: z.output<typeof methods['client.launch']['params']>): Promise<Result<'client.launch'>> {
     if (this.clientStatus().running) return this.clientStatus();
+    this.load = { gameLoad: false, loaded: false };
     // A quitting player keeps its old ID for a short time (SPEC-0003 F4). Only a new ID counts as joined.
     const before = new Set(await this.playerIds());
     const since = Date.now() - 2000;
@@ -348,7 +378,13 @@ class Daemon {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
       if (this.connection.state === 'failed' || this.connection.state === 'stopped') break;
-      const joined = (await this.playerIds()).find((id) => !before.has(id));
+      const { initCoreDoneAt, gameLoad, loaded } = this.load;
+      if (initCoreDoneAt !== undefined && !gameLoad && Date.now() - initCoreDoneAt > STALL_AFTER_INIT_CORE_MS) {
+        this.connection = { state: 'failed', reason: `${STALL_REASON} for ${Math.round(STALL_AFTER_INIT_CORE_MS / 1000)} s` };
+        break;
+      }
+      // The server sees the player before the game world is loaded, so `joined` also waits for the load.
+      const joined = loaded ? (await this.playerIds()).find((id) => !before.has(id)) : undefined;
       if (joined !== undefined) {
         this.connection = { state: 'joined', src: joined };
         break;
@@ -471,8 +507,17 @@ class Daemon {
       }
       case 'window.key': {
         const p = methods['window.key'].params.parse(params);
-        const code = keyCode(p.key);
-        await this.window.request('key', { scan: code.scan, extended: code.extended, holdMs: p.holdMs ?? 50 }, 15_000);
+        const codes = keyChord(p.key);
+        const [code] = codes;
+        if (codes.length === 1 && code) {
+          await this.window.request('key', { scan: code.scan, extended: code.extended, holdMs: p.holdMs ?? 50 }, 15_000);
+        } else {
+          await this.window.request(
+            'chord',
+            { scans: codes.map((c) => c.scan), extended: codes.map((c) => c.extended), holdMs: p.holdMs ?? 50 },
+            15_000,
+          );
+        }
         return {};
       }
       case 'window.text': {
