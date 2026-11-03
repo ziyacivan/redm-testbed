@@ -109,11 +109,24 @@ public static class Testbed {
     INPUT i = new INPUT(); i.type = 1; i.u.ki.wScan = scan; i.u.ki.dwFlags = flags; return i;
   }
 
+  // A held key of a real keyboard repeats its key down after 500 ms, every 33 ms. RedM counts a game control (a prompt
+  // hold) as released when no repeat comes, so a hold sends the repeats too.
+  static void Hold(INPUT[] downs, int holdMs) {
+    int total = Math.Max(holdMs, 30);
+    if (total <= 500) { Thread.Sleep(total); return; }
+    Thread.Sleep(500);
+    for (int left = total - 500; left > 0; left -= 33) {
+      Send(downs);
+      Thread.Sleep(Math.Min(33, left));
+    }
+  }
+
   public static void PressKey(int scan, bool extended, int holdMs) {
     Focus();
     uint flags = KEYEVENTF_SCANCODE | (extended ? KEYEVENTF_EXTENDEDKEY : 0);
-    Send(new INPUT[] { Key((ushort)scan, flags) });
-    Thread.Sleep(Math.Max(holdMs, 30));
+    INPUT[] down = new INPUT[] { Key((ushort)scan, flags) };
+    Send(down);
+    Hold(down, holdMs);
     Send(new INPUT[] { Key((ushort)scan, flags | KEYEVENTF_KEYUP) });
   }
 
@@ -123,7 +136,8 @@ public static class Testbed {
       Send(new INPUT[] { Key((ushort)scans[k], KEYEVENTF_SCANCODE | (extended[k] ? KEYEVENTF_EXTENDEDKEY : 0)) });
       Thread.Sleep(20);
     }
-    Thread.Sleep(Math.Max(holdMs, 30));
+    INPUT[] last = new INPUT[] { Key((ushort)scans[scans.Length - 1], KEYEVENTF_SCANCODE | (extended[scans.Length - 1] ? KEYEVENTF_EXTENDEDKEY : 0)) };
+    Hold(last, holdMs);
     for (int k = scans.Length - 1; k >= 0; k--) {
       Send(new INPUT[] { Key((ushort)scans[k], KEYEVENTF_SCANCODE | (extended[k] ? KEYEVENTF_EXTENDEDKEY : 0) | KEYEVENTF_KEYUP) });
       Thread.Sleep(20);
