@@ -25,8 +25,14 @@ export type Response = z.infer<typeof response>;
 // The first line of a relay connection. It proves that the caller can read the daemon token.
 export const auth = z.object({ auth: z.string().min(16) });
 
+// JSON with every non-ASCII character as a \uXXXX escape. The text then survives a hop that reads stdin with a
+// legacy code page (Windows PowerShell 5.1 reads it with the OEM code page).
+export function asciiJson(value: unknown): string {
+  return JSON.stringify(value).replace(/[\u007f-\uffff]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+}
+
 export function encode(message: unknown): string {
-  return `${JSON.stringify(message)}\n`;
+  return `${asciiJson(message)}\n`;
 }
 
 // Splits a byte stream into lines. Keeps a partial line until the next chunk.

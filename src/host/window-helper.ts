@@ -2,7 +2,7 @@
 // The daemon runs in the interactive session (D3), so the helper can read and drive the game window.
 // The script is a string here, so `tsc` output contains it without a copy step.
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
-import { LineSplitter } from '../protocol/rpc.ts';
+import { asciiJson, LineSplitter } from '../protocol/rpc.ts';
 
 const CSHARP = String.raw`
 using System;
@@ -283,7 +283,7 @@ export class WindowHelper {
         reject(new Error(`the window helper gave no answer to ${op} in ${timeoutMs} ms`));
       }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
-      child.stdin.write(`${JSON.stringify({ ...args, id, op })}\n`);
+      child.stdin.write(`${asciiJson({ ...args, id, op })}\n`);
     });
   }
 

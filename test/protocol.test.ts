@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeRconReply, encodeRconRequest } from '../src/cfx/rcon.ts';
 import { pipeName, projectConfig } from '../src/protocol/config.ts';
 import { isMethodName } from '../src/protocol/messages.ts';
-import { LineSplitter } from '../src/protocol/rpc.ts';
+import { asciiJson, LineSplitter } from '../src/protocol/rpc.ts';
 
 describe('rcon framing', () => {
   it('encodes a request with the 0xFF prefix', () => {
@@ -99,5 +99,14 @@ describe('extra secrets', async () => {
     expect(secretLine('a', 'ok')).toBe('set a "ok"');
     expect(() => secretLine('a', 'x" exec evil')).toThrow();
     expect(() => secretLine('a', 'x\nquit')).toThrow();
+  });
+});
+
+describe('asciiJson', () => {
+  it('escapes non-ASCII text and keeps the value', () => {
+    const value = { text: 'Şükrü Öğün çiçek ı İ 🐎' };
+    const json = asciiJson(value);
+    expect(json).toMatch(/^[\x20-\x7e]*$/);
+    expect(JSON.parse(json)).toEqual(value);
   });
 });
